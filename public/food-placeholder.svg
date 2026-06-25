@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <rect width="200" height="200" fill="#0f172a"/>
+  <!-- Decorative Plate -->
+  <circle cx="100" cy="100" r="75" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="6 4"/>
+  <circle cx="100" cy="100" r="65" fill="#1e293b"/>
+  <!-- Cloche / Food Cover Silhouette -->
+  <path d="M60 115 A 40 40 0 0 1 140 115 Z" fill="none" stroke="#f97316" stroke-width="4"/>
+  <rect x="55" y="115" width="90" height="6" rx="3" fill="#f97316"/>
+  <circle cx="100" cy="72" r="7" fill="#f97316"/>
+  <!-- Sparkles -->
+  <path d="M100 35 L102 43 L110 45 L102 47 L100 55 L98 47 L90 45 L98 43 Z" fill="#fbbf24"/>
+  <path d="M50 70 L51 75 L56 76 L51 77 L50 82 L49 77 L44 76 L49 75 Z" fill="#fbbf24" transform="scale(0.8) translate(15, 10)"/>
+  <path d="M150 70 L151 75 L156 76 L151 77 L150 82 L149 77 L144 76 L149 75 Z" fill="#fbbf24" transform="scale(0.8) translate(35, 10)"/>
+  <!-- Label Text -->
+  <text x="100" y="150" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="bold" fill="#64748b" text-anchor="middle" letter-spacing="1">ZEST &amp; FIRE</text>
+</svg>

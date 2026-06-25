@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Playfair Display', serif;
+  
+  --color-brand-primary: #ea580c; /* bg-orange-600 */
+  --color-brand-primary-hover: #c2410c; /* bg-orange-700 */
+  --color-brand-bg: #f8fafc; /* bg-slate-50 */
+  --color-brand-dark: #0f172a; /* bg-slate-900 */
+  --color-brand-accent: #f59e0b; /* bg-amber-500 */
+}
+
+/* Custom styles and transitions */
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  .glassmorphism {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .glassmorphism-dark {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom active animations for live tracker and notification items */
+@keyframes checkmark-draw {
+  0% {
+    stroke-dashoffset: 48;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw {
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: checkmark-draw 0.6s cubic-bezier(0.65, 0, 0.45, 1) 0.3s forwards;
+}
+
+/* QR Code Printing Custom Media Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .printable-qr-grid, .printable-qr-grid * {
+    visibility: visible;
+  }
+  
+  .printable-qr-grid {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .qr-card-print {
+    border: 2px dashed #000 !important;
+    padding: 24px !important;
+    page-break-inside: avoid !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    text-align: center !important;
+  }
+  
+  /* Hide non-printable elements */
+  .no-print {
+    display: none !important;
+  }
+}
