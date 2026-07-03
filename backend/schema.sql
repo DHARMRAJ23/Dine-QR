@@ -518,8 +518,8 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: User is not an administrator.';
   END IF;
 
-  DELETE FROM order_items;
-  DELETE FROM orders;
+  DELETE FROM order_items WHERE id IS NOT NULL;
+  DELETE FROM orders WHERE id IS NOT NULL;
 END;
 $$;
 
