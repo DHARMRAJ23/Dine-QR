@@ -602,3 +602,15 @@ GRANT EXECUTE ON FUNCTION delete_menu_item(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION clear_all_orders() TO authenticated;
 GRANT EXECUTE ON FUNCTION generate_tables(INT) TO authenticated;
 GRANT EXECUTE ON FUNCTION rotate_table_token(UUID) TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 12. SEED DEMO RESTAURANT AND TABLE
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Seed default demo restaurant and a secure Table 1 mock token to allow testing instantly
+INSERT INTO public.restaurants (id, name)
+VALUES ('11111111-1111-1111-1111-111111111111', 'Dine-QR Demo Restaurant')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.restaurant_tables (restaurant_id, table_number, qr_token)
+VALUES ('11111111-1111-1111-1111-111111111111', 1, 'table-1-qr-xyz')
+ON CONFLICT (qr_token) DO NOTHING;
