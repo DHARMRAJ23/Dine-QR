@@ -1,54 +1,68 @@
 # 🍽️ Dine-In QR Menu System
 
-A fully **serverless, static, client-side** restaurant ordering system built with React 19 + TypeScript + Tailwind CSS v4. Customers scan a table QR code to browse the menu and place orders. The admin dashboard receives and manages orders in real-time — all without a backend server.
+A responsive, production-ready restaurant ordering application built with **React 19 + TypeScript + Tailwind CSS v4**, backed by **Supabase** for secure user authentication, database persistence, and instant real-time order updates.
+
+Customers scan a table-specific QR code to browse the menu, add items to their cart, place orders securely, and track status changes in real-time. Staff log in to a secure Admin Panel to manage the active order board via a Kanban layout, edit the menu catalogue, and print table QR codes.
 
 ---
 
 ## 🚀 Quick Start
 
+### 1. Configure Environment
+
+Create a `.env.local` file in the project root containing your Supabase credentials:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key # Required for seeding script only
+```
+
+### 2. Setup Database Schema
+
+Execute the SQL schema migration in your Supabase SQL Editor:
+
+- Run [supabase/schema.sql](file:///d:/DINE-QR/supabase/schema.sql) to create tables, enable Row-Level Security (RLS) policies, and define database functions.
+
+### 3. Run Seeding & Start Development
+
 ```bash
 # Install dependencies
 npm install
 
-# Start development server (hot reload)
+# Seed default menu items
+node --env-file=.env.local supabase/seed-db.js
+
+# Start local development server (with HMR)
 npm run dev
 
-# Run all unit tests
+# Run all unit and integration tests
 npm test
+
+# Format codebase using Prettier
+npm run format
+
+# Run linter checks
+npm run lint
 
 # Production build (outputs to dist/)
 npm run build
 ```
 
-The app runs at `http://localhost:5173` by default.
+The application runs at `http://localhost:5173` by default.
 
 ---
 
-## 🔑 Demo Credentials
+## 🔐 Authentication & Access Control
 
-| Role  | URL                                | Username | Password |
-|-------|------------------------------------|----------|----------|
-| Admin | `http://localhost:5173/#/admin/login` | `admin`  | `admin123` |
+Admin roles are secured via **Supabase Auth**:
 
-> ⚠️ These are **hardcoded demo credentials**. See [Security Notes](#-security-notes) before deploying.
-
----
-
-## 📱 How to Use
-
-### Customer Flow
-1. Scan the QR code for your table (or go to `/#/menu/5` for table 5)
-2. Browse the menu by category
-3. Add items to your cart
-4. Go to cart (`/#/cart`), enter your name, optionally add kitchen notes
-5. Tap **Place Order**
-6. Track your order live at `/#/status/<orderId>`
-
-### Admin Flow
-1. Log in at `/#/admin/login`
-2. **Order Board** (`/#/admin/dashboard`) — see incoming orders in real-time, advance them through the Kanban stages
-3. **Menu Manager** (`/#/admin/menu`) — add/edit/delete items, toggle availability
-4. **QR Codes** (`/#/admin/qr-codes`) — generate and print table QR codes
+1. Create a user account in your Supabase Project Dashboard under **Authentication -> Users**.
+2. Grant that user admin access by running an SQL query inserting their UUID into the `admin_users` database table:
+   ```sql
+   INSERT INTO public.admin_users (id) VALUES ('<USER_UUID>');
+   ```
+3. Navigate to `/#/admin/login` and sign in with the user credentials.
 
 ---
 
@@ -56,216 +70,124 @@ The app runs at `http://localhost:5173` by default.
 
 ### Technology Stack
 
-| Layer            | Technology          | Version |
-|------------------|---------------------|---------|
-| Framework        | React               | 19      |
-| Language         | TypeScript          | ~6.0    |
-| Build Tool       | Vite                | 8       |
-| Styling          | Tailwind CSS        | v4      |
-| Routing          | React Router (Hash) | 7       |
-| Icons            | Lucide React        | 1.x     |
-| QR Codes         | qrcode.react        | 4       |
-| Testing          | Vitest + RTL        | 4 / 16  |
-| Linting          | OxLint              | 1.x     |
+| Layer        | Technology          | Version | Description                        |
+| ------------ | ------------------- | ------- | ---------------------------------- |
+| Frontend     | React               | 19      | Component rendering                |
+| Language     | TypeScript          | ~6.0    | Type safety and interfaces         |
+| Backend & DB | Supabase            | Latest  | Auth, PostgreSQL, and Realtime     |
+| Build Tool   | Vite                | 8       | Bundling & HMR                     |
+| Styling      | Tailwind CSS        | v4      | CSS utilities                      |
+| Routing      | React Router (Hash) | 7       | Routing without server redirection |
+| Testing      | Vitest + RTL        | 4 / 16  | Unit/integration testing           |
+| Formatting   | Prettier            | 3.x     | Code formatting                    |
+| Linting      | OxLint              | 1.x     | Fast static analysis               |
 
 ### Why HashRouter?
 
-The app is designed for **static hosting** (GitHub Pages, any CDN) without server-side routing configuration. `HashRouter` uses the URL fragment (`#`) so navigating to `/#/admin/dashboard` works correctly without a server returning `index.html` for all paths.
+The app is optimized for **static hosting** (GitHub Pages, Vercel, Netlify, or any CDN) without requiring server-side routing fallback configurations. `HashRouter` uses the URL fragment (`#`) to maintain paths, allowing direct links like `/#/admin/dashboard` to resolve correctly without a custom server.
 
 ### State Management
 
-All application state lives in a single **React Context** (`CartContext`). No Redux, no Zustand.
+All application state lives in a single **React Context** (`CartContext`) that coordinates fetches and updates to/from **Supabase**.
 
 ```
 CartProvider (wraps entire app)
-├── menuItems   → persisted in localStorage['dine_in_menu']
-├── orders      → persisted in localStorage['dine_in_orders']
+├── menuItems   → fetched and managed via Supabase Database
+├── orders      → fetched and managed via Supabase Database (Realtime subscription)
 └── cart        → persisted in sessionStorage['dine_in_cart']
     guestName   → persisted in sessionStorage['dine_in_guest_name']
     tableId     → persisted in sessionStorage['dine_in_table_id']
 ```
 
-`sessionStorage` is intentional for cart data — it resets when the tab closes, so a new customer at the same device starts fresh.
+`sessionStorage` is intentional for cart and guest session data — it resets when the tab closes, so a new customer starting at that table starts fresh.
 
-### Cross-Tab Real-Time Sync
+### Real-Time Sync
 
-The app simulates a WebSocket connection using the browser's native `storage` event:
+Cross-tab live updates are handled natively by **Supabase Realtime**:
 
-```
-Customer Tab                     Admin Tab
-─────────────                    ──────────
-socketBus.emit('new_order')  ──► localStorage write
-       │                                │
-       ▼                          storage event fires
-Local listeners update          Local listeners update
-immediately (same tab)          in admin tab
-```
-
-The `SimulatedSocketBus` class in `src/utils/eventBus.ts` handles both same-tab (local dispatch) and cross-tab (localStorage bridge) communication.
+1. When a customer places an order via the secure `place_order` RPC, the record is inserted into the `orders` table.
+2. The Admin Dashboard is subscribed to the `orders` publication channel in Supabase.
+3. Upon order updates, the dashboard receives real-time updates instantly, playing a warm double-note POS notification chime synthesized via the Web Audio API.
 
 ---
 
 ## 📁 Project Structure
 
 ```
+supabase/
+├── schema.sql              # Database schema migrations & RPC procedures
+├── reset-db-data.sql       # Safe order truncation script
+└── seed-db.js              # Database menu item & restaurant seeder
+
 src/
-├── main.tsx                    # App entry point (React 18 createRoot)
-├── App.tsx                     # Root component: providers + routing + global UI
-├── index.css                   # Global styles + Tailwind imports + print media
-├── App.css                     # App-scoped utility overrides
+├── main.tsx                # App entry point (React 18 createRoot)
+├── App.tsx                 # Root component: router + offline banner + notifications
+├── index.css               # Global styles + Tailwind imports + print media formatting
 │
 ├── types/
-│   └── index.ts                # All shared TypeScript interfaces (FoodItem, Order, etc.)
+│   └── index.ts            # Shared TypeScript interfaces (FoodItem, Order, etc.)
 │
 ├── config/
-│   └── billing.ts              # Tax rate (5% GST) + service charge (₹20) constants
+│   └── billing.ts          # Tax rate (5% GST) + service charge constants
 │
 ├── data/
-│   └── mockData.ts             # Default menu items (INITIAL_FOOD_ITEMS) + CATEGORIES list
+│   └── mockData.ts         # Default menu items (INITIAL_FOOD_ITEMS) + CATEGORIES list
 │
 ├── context/
-│   ├── CartContext.tsx         # 🌐 Global state: menu, cart, orders + all actions
-│   └── AuthContext.tsx         # 🔐 Admin session management (demo auth)
+│   ├── CartContext.tsx     # Global state: menu, cart, orders + Supabase mutations
+│   └── AuthContext.tsx     # Admin session management via Supabase Auth
 │
 ├── utils/
-│   ├── eventBus.ts             # 📡 Simulated WebSocket (localStorage cross-tab bridge)
-│   ├── storage.ts              # 🛡️ Safe localStorage/sessionStorage helpers + type guards
-│   ├── audio.ts                # 🔔 Web Audio API POS chime for new orders
-│   └── storage.test.ts         # Unit tests for storage utility
+│   ├── storage.ts          # Safe localStorage/sessionStorage helpers + type guards
+│   ├── audio.ts            # Web Audio API POS chime synthesis for new orders
+│   └── storage.test.ts     # Unit tests for storage utility
 │
 └── components/
     ├── common/
-    │   └── ErrorBoundary.tsx   # React error boundary (prevents white screen crashes)
+    │   └── ErrorBoundary.tsx   # React error boundary recovery screen
     │
     ├── customer/
-    │   ├── MainMenu.tsx        # Customer: browse menu by category + add to cart
-    │   ├── CartPage.tsx        # Customer: review cart + enter name + place order
-    │   └── LiveTracker.tsx     # Customer: real-time order status + receipt
+    │   ├── MainMenu.tsx    # Customer: browse menu + validate table token
+    │   ├── CartPage.tsx    # Customer: review cart + checkout
+    │   └── LiveTracker.tsx # Customer: real-time order status tracking with PIN entry
     │
     └── admin/
-        ├── AdminLogin.tsx      # Admin: login form (demo credentials)
-        ├── AdminSidebar.tsx    # Admin: persistent nav + reset actions + logout
-        ├── OrderBoard.tsx      # Admin: 3-column Kanban board (placed/preparing/served)
-        ├── MenuManager.tsx     # Admin: add/edit/delete/toggle menu items
-        └── QRCodeGenerator.tsx # Admin: generate + print QR codes for all tables
+        ├── AdminLogin.tsx      # Admin: login form with cooldown protection
+        ├── AdminSidebar.tsx    # Admin: persistent sidebar navigation
+        ├── OrderBoard.tsx      # Admin: live Kanban board (placed/preparing/served)
+        ├── MenuManager.tsx     # Admin: add/edit/delete/toggle menu catalogue
+        └── QRCodeGenerator.tsx # Admin: generate + print QR codes for tables
 ```
 
 ---
 
-## 📦 localStorage / sessionStorage Key Reference
+## 📦 Browser Storage Key Reference
 
-| Key                            | Storage       | What's stored                                 |
-|--------------------------------|---------------|-----------------------------------------------|
-| `dine_in_menu`                 | localStorage  | `FoodItem[]` — the current restaurant menu    |
-| `dine_in_orders`               | localStorage  | `Order[]` — all placed orders                 |
-| `dine_in_cart`                 | sessionStorage| `CartItem[]` — current customer's cart        |
-| `dine_in_table_id`             | sessionStorage| `string` — table number from QR scan          |
-| `dine_in_guest_name`           | sessionStorage| `string` — customer's entered name            |
-| `dine_in_special_instructions` | sessionStorage| `string` — customer's kitchen notes           |
-| `demo_admin_session`           | localStorage  | `AdminSession` — admin auth token + expiry    |
-| `dine_in_socket_event`         | localStorage  | Ephemeral cross-tab event payload (overwritten each emit) |
+| Key                            | Storage        | Description                                               |
+| ------------------------------ | -------------- | --------------------------------------------------------- |
+| `dine_in_cart`                 | sessionStorage | `CartItem[]` — current customer's cart items              |
+| `dine_in_table_id`             | sessionStorage | `string` — friendly table number (e.g., "3")              |
+| `dine_in_table_token`          | sessionStorage | `string` — secure table token (e.g., "tbl_8F3KQ9ZP")      |
+| `dine_in_guest_name`           | sessionStorage | `string` — customer's entered checkout name               |
+| `dine_in_special_instructions` | sessionStorage | `string` — customer's kitchen notes                       |
+| `order_pin_<orderId>`          | sessionStorage | `string` — secure 6-digit access PIN code for LiveTracker |
 
 ---
 
-## 💰 Billing Calculation
+## 🛡️ Security Implementation
 
-All monetary values are in **Indian Rupees (₹)** as integers.
+Unlike typical simple mock apps, this system implements rigorous security boundaries to prevent checkout exploits:
 
-```
-Subtotal      = Σ (item.price × item.quantity)
-Tax           = round(subtotal × 0.05)   // 5% GST
-Service Charge = ₹20 (flat per order)
-Grand Total   = subtotal + tax + serviceCharge
-```
-
-To change rates, edit `src/config/billing.ts` — the change automatically propagates to CartContext, CartPage, and LiveTracker.
-
----
-
-## 🔄 Order State Machine
-
-Orders can only move **forward** through statuses, never backward:
-
-```
-placed  →  accepted  →  preparing  →  served
-```
-
-Any other transition is silently rejected by `isValidOrderTransition()` in `CartContext.tsx`.
-
----
-
-## 🧪 Testing
-
-```bash
-npm test           # Run all tests once (CI-friendly)
-npm test -- --watch  # Watch mode for development
-```
-
-Test files:
-- `src/utils/storage.test.ts` — Unit tests for storage helpers and type guards
-- `src/context/CartContext.test.tsx` — Integration tests for cart and order flow
-
----
-
-## 🛡️ Security Notes
-
-> **This is a demo/prototype application.** The following security limitations exist by design and MUST be addressed before production deployment:
-
-| Issue | Current State | Production Fix |
-|-------|---------------|----------------|
-| Admin credentials | Hardcoded in `AuthContext.tsx` | Use a real auth provider (Firebase Auth, Auth0, Supabase) |
-| Session storage | JWT mock in localStorage | Use HttpOnly cookies + server-issued real JWTs |
-| No server | All data is client-side | Add a backend (Node.js, Firebase, Supabase) |
-| No access control | Any user can access `/admin/*` without a real session | Server-side route protection |
-| No XSS protection | Input sanitisation is basic (max length, no HTML tags) | Content Security Policy headers |
-| No rate limiting | Order placement is unlimited | Server-side rate limiting |
+- **Server-Side Pricing**: Cart totals are computed server-side in the Supabase PostgreSQL database during execution of the `place_order` RPC. Edits to pricing in client devtools are completely ignored.
+- **Table Token Security**: Tables are identified using long, cryptographically secure random QR tokens (e.g., `tbl_8F3KQ9ZP`), rather than sequential integers, to prevent token-guessing attacks.
+- **Row-Level Security (RLS)**: Strict RLS policies are enabled on all tables. Admins can view order channels, but guests can only query specific orders using a secure, cryptographically generated 6-digit PIN.
+- **Rate Limiting**: Cooldown limits (30 seconds per table) are enforced directly inside the checkout trigger to prevent denial-of-service order spamming.
 
 ---
 
 ## 🖨️ Printing QR Codes
 
-1. Go to `/#/admin/qr-codes`
-2. Enter the range of table numbers (e.g. 1 to 20)
-3. Click **"Print All"** to open the print dialog
-4. The print CSS in `index.css` formats cards in a 2-column A4 grid automatically
-
----
-
-## 🔧 Development Notes
-
-### Adding a New Page
-
-1. Create the component in the appropriate folder (`customer/` or `admin/`)
-2. Add a `@fileoverview` JSDoc comment at the top
-3. Add the route in `App.tsx` inside `<Routes>`
-4. If admin-only, wrap with `<ProtectedRoute>`
-5. Add a nav link in `AdminSidebar.tsx` (if admin page)
-
-### Adding a New Menu Category
-
-1. Add an entry to `CATEGORIES` in `src/data/mockData.ts`
-2. The `MainMenu.tsx` tab navigation and `MenuManager.tsx` category dropdown update automatically
-
-### Changing the Tax or Service Charge
-
-Edit `src/config/billing.ts` — all billing UI and calculations read from this file.
-
-### Resetting All Data (Dev)
-
-Use the Admin Sidebar → **"Full Reset"** button, or clear localStorage manually:
-```js
-// In browser console:
-localStorage.clear(); sessionStorage.clear(); location.reload();
-```
-
----
-
-## 📋 npm Scripts Reference
-
-| Script          | What it does                                          |
-|-----------------|-------------------------------------------------------|
-| `npm run dev`   | Start Vite dev server with HMR at localhost:5173      |
-| `npm test`      | Run all Vitest unit tests once (no watch)             |
-| `npm run build` | TypeScript check + Vite production bundle → `dist/`   |
-| `npm run lint`  | Run OxLint static analysis on the source              |
-| `npm run preview` | Serve the production `dist/` bundle locally         |
+1. Log in to the Admin Panel and go to `/#/admin/qr-codes`.
+2. Enter the range of table numbers (e.g., 1 to 20).
+3. Click **"Print All"** to open the system print dialog.
+4. The print CSS media queries in `index.css` will automatically format the cards into a clean 2-column A4 grid ready for cutting and placing on restaurant tables.
