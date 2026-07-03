@@ -10,7 +10,7 @@ Customers scan a table-specific QR code to browse the menu, add items to their c
 
 ### 1. Configure Environment
 
-Create a `.env.local` file in the project root containing your Supabase credentials:
+Create a `.env.local` file inside the `frontend/` directory containing your Supabase credentials:
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
@@ -22,31 +22,26 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key # Required for seeding script on
 
 Execute the SQL schema migration in your Supabase SQL Editor:
 
-- Run [supabase/schema.sql](file:///d:/DINE-QR/supabase/schema.sql) to create tables, enable Row-Level Security (RLS) policies, and define database functions.
+- Run [backend/schema.sql](file:///d:/DINE-QR/backend/schema.sql) to create tables, enable Row-Level Security (RLS) policies, and define database functions.
 
 ### 3. Run Seeding & Start Development
 
 ```bash
-# Install dependencies
+# Set up backend and seed database
+cd backend
 npm install
+npm run seed
 
-# Seed default menu items
-node --env-file=.env.local supabase/seed-db.js
-
-# Start local development server (with HMR)
+# Set up and start frontend (go back to root first)
+cd ../frontend
+npm install
 npm run dev
 
-# Run all unit and integration tests
-npm test
-
-# Format codebase using Prettier
-npm run format
-
-# Run linter checks
-npm run lint
-
-# Production build (outputs to dist/)
-npm run build
+# Other useful frontend commands (run inside frontend/ directory):
+npm test        # Run unit & integration tests
+npm run format  # Format codebase with Prettier
+npm run lint    # Run linter checks
+npm run build   # Build production package
 ```
 
 The application runs at `http://localhost:5173` by default.
@@ -114,49 +109,60 @@ Cross-tab live updates are handled natively by **Supabase Realtime**:
 ## 📁 Project Structure
 
 ```
-supabase/
+backend/
 ├── schema.sql              # Database schema migrations & RPC procedures
 ├── reset-db-data.sql       # Safe order truncation script
 └── seed-db.js              # Database menu item & restaurant seeder
 
-src/
-├── main.tsx                # App entry point (React 18 createRoot)
-├── App.tsx                 # Root component: router + offline banner + notifications
-├── index.css               # Global styles + Tailwind imports + print media formatting
+frontend/
+├── index.html              # Vite template index HTML
+├── vite.config.ts          # Vite compilation settings
+├── vitest.config.ts        # Vitest configurations
+├── tsconfig.json           # TS workspace configuration
+├── package.json            # Node project configuration
 │
-├── types/
-│   └── index.ts            # Shared TypeScript interfaces (FoodItem, Order, etc.)
+├── public/                 # Public static assets
+│   ├── favicon.svg
+│   └── food-placeholder.svg
 │
-├── config/
-│   └── billing.ts          # Tax rate (5% GST) + service charge constants
-│
-├── data/
-│   └── mockData.ts         # Default menu items (INITIAL_FOOD_ITEMS) + CATEGORIES list
-│
-├── context/
-│   ├── CartContext.tsx     # Global state: menu, cart, orders + Supabase mutations
-│   └── AuthContext.tsx     # Admin session management via Supabase Auth
-│
-├── utils/
-│   ├── storage.ts          # Safe localStorage/sessionStorage helpers + type guards
-│   ├── audio.ts            # Web Audio API POS chime synthesis for new orders
-│   └── storage.test.ts     # Unit tests for storage utility
-│
-└── components/
-    ├── common/
-    │   └── ErrorBoundary.tsx   # React error boundary recovery screen
+└── src/
+    ├── main.tsx            # App entry point (React 18 createRoot)
+    ├── App.tsx             # Root component: router + offline banner
+    ├── index.css           # Global styles + Tailwind imports + print media
     │
-    ├── customer/
-    │   ├── MainMenu.tsx    # Customer: browse menu + validate table token
-    │   ├── CartPage.tsx    # Customer: review cart + checkout
-    │   └── LiveTracker.tsx # Customer: real-time order status tracking with PIN entry
+    ├── types/
+    │   └── index.ts        # Shared TypeScript interfaces
     │
-    └── admin/
-        ├── AdminLogin.tsx      # Admin: login form with cooldown protection
-        ├── AdminSidebar.tsx    # Admin: persistent sidebar navigation
-        ├── OrderBoard.tsx      # Admin: live Kanban board (placed/preparing/served)
-        ├── MenuManager.tsx     # Admin: add/edit/delete/toggle menu catalogue
-        └── QRCodeGenerator.tsx # Admin: generate + print QR codes for tables
+    ├── config/
+    │   └── billing.ts      # Billing constants (GST, service charge)
+    │
+    ├── data/
+    │   └── mockData.ts     # Category definitions + category assets list
+    │
+    ├── context/
+    │   ├── CartContext.tsx # Cart state manager (Supabase RPC integrations)
+    │   └── AuthContext.tsx # Admin Supabase Auth session coordinator
+    │
+    ├── utils/
+    │   ├── storage.ts      # Safe browser storage read/write wrappers
+    │   ├── audio.ts        # Web Audio API POS notification chime
+    │   └── storage.test.ts # Storage wrapper unit test suite
+    │
+    └── components/
+        ├── common/
+        │   └── ErrorBoundary.tsx # React boundary crash safety page
+        │
+        ├── customer/
+        │   ├── MainMenu.tsx    # Customer: Browse menu
+        │   ├── CartPage.tsx    # Customer: Checkout cart
+        │   └── LiveTracker.tsx # Customer: Status receipt with PIN lock
+        │
+        └── admin/
+            ├── AdminLogin.tsx    # Admin: Login with security cooldown
+            ├── AdminSidebar.tsx  # Admin: Navigation menu
+            ├── OrderBoard.tsx    # Admin: Kanban live board
+            ├── MenuManager.tsx   # Admin: CRUD operations for catalogue
+            └── QRCodeGenerator.tsx # Admin: Generate & print table cards
 ```
 
 ---

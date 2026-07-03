@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"supabase/**/*.js\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"../backend/**/*.js\"",
     "test": "vitest run",
     "preview": "vite preview"
   },

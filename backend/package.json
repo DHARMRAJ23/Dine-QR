@@ -1,0 +1,11 @@
+{
+  "name": "dine-in-qr-backend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node --env-file=../frontend/.env.local seed-db.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.0"
+  }
+}

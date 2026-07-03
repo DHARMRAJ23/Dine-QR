@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { INITIAL_FOOD_ITEMS } from "../src/data/mockData.ts";
+import { INITIAL_FOOD_ITEMS } from "../frontend/src/data/mockData.ts";
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey =
@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
     "Error: VITE_SUPABASE_URL and either SUPABASE_SERVICE_ROLE_KEY or VITE_SUPABASE_ANON_KEY must be set.",
   );
   console.error("Run this script using Node.js 20.6+ with env loading, e.g.:");
-  console.error("  node --env-file=.env.local supabase/seed-db.js");
+  console.error("  node --env-file=frontend/.env.local backend/seed-db.js");
   process.exit(1);
 }
 
