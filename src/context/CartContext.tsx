@@ -1,3 +1,4 @@
+/* eslint-disable react/only-export-components */
 import React, {
   createContext,
   useContext,
@@ -400,7 +401,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!error) {
       loadData();
     } else {
-      showToast("Failed to toggle item availability: " + error.message, "error");
+      showToast(
+        "Failed to toggle item availability: " + error.message,
+        "error",
+      );
     }
   };
 

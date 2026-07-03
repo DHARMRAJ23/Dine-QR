@@ -53,7 +53,9 @@ export const AdminLogin: React.FC = () => {
     setError("");
 
     if (cooldownTime > 0) {
-      setError(`Too many failed attempts. Please wait ${cooldownTime} seconds.`);
+      setError(
+        `Too many failed attempts. Please wait ${cooldownTime} seconds.`,
+      );
       return;
     }
 
@@ -75,7 +77,9 @@ export const AdminLogin: React.FC = () => {
       if (nextFailedAttempts >= 3) {
         const cooldown = 5 * (nextFailedAttempts - 2);
         setCooldownTime(cooldown);
-        setError(`Authentication failed. Too many failed attempts. Cooldown of ${cooldown} seconds active.`);
+        setError(
+          `Authentication failed. Too many failed attempts. Cooldown of ${cooldown} seconds active.`,
+        );
       } else {
         setError(err.message || "Authentication failed. Please try again.");
       }

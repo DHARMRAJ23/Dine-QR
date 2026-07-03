@@ -34,7 +34,7 @@
  * Displays: table number, guest name, all ordered items with quantities and prices,
  * subtotal, GST, service charge, and grand total.
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 // removed useCart
 import { supabase } from "../../lib/supabase";
@@ -119,34 +119,37 @@ export const LiveTracker: React.FC = () => {
   };
 
   // Fetch Order Securely via RPC
-  const fetchOrder = async (pinToUse: string) => {
-    if (!orderId) return;
-    setIsLoading(true);
-    setPinError("");
+  const fetchOrder = useCallback(
+    async (pinToUse: string) => {
+      if (!orderId) return;
+      setIsLoading(true);
+      setPinError("");
 
-    try {
-      const { data, error } = await supabase.rpc("get_order_by_pin", {
-        p_order_id: orderId,
-        p_pin_code: pinToUse,
-      });
+      try {
+        const { data, error } = await supabase.rpc("get_order_by_pin", {
+          p_order_id: orderId,
+          p_pin_code: pinToUse,
+        });
 
-      if (error) throw error;
-      if (!data || !data.success) {
-        setPinError(data?.error || "Invalid PIN Code");
-        setIsPinValid(false);
-        setCurrentOrder(null);
-      } else {
-        setIsPinValid(true);
-        setCurrentOrder(data.order);
-        sessionStorage.setItem(`order_pin_${orderId}`, pinToUse);
+        if (error) throw error;
+        if (!data || !data.success) {
+          setPinError(data?.error || "Invalid PIN Code");
+          setIsPinValid(false);
+          setCurrentOrder(null);
+        } else {
+          setIsPinValid(true);
+          setCurrentOrder(data.order);
+          sessionStorage.setItem(`order_pin_${orderId}`, pinToUse);
+        }
+      } catch (err) {
+        console.error(err);
+        setPinError("Failed to verify PIN. Please try again.");
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err) {
-      console.error(err);
-      setPinError("Failed to verify PIN. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [orderId],
+  );
 
   useEffect(() => {
     if (pin) {
@@ -154,7 +157,7 @@ export const LiveTracker: React.FC = () => {
     } else {
       setIsLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, fetchOrder, pin]);
 
   // Handle Realtime updates securely
   useEffect(() => {
@@ -181,7 +184,7 @@ export const LiveTracker: React.FC = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isPinValid, orderId, pin]);
+  }, [isPinValid, orderId, pin, fetchOrder]);
 
   if (isLoading) {
     return (

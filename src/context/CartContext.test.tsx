@@ -175,11 +175,13 @@ describe("CartContext & Billing Calculations", () => {
     expect(hook!.tableToken).toBe("tbl_TESTTOKEN");
   });
 
-  it("stores tableToken and tableId both in sessionStorage", () => {
+  it("stores tableToken and tableId both in sessionStorage", async () => {
     let hook: ReturnType<typeof useCart> | null = null;
     renderCartContext((h) => {
       hook = h;
     });
+
+    await waitFor(() => expect(hook!.menuItems.length).toBeGreaterThan(0));
 
     act(() => {
       hook!.setTableId("7", "tbl_MYTOKEN9");
@@ -192,11 +194,13 @@ describe("CartContext & Billing Calculations", () => {
     );
   });
 
-  it("clears tableToken when setTableId is called with null", () => {
+  it("clears tableToken when setTableId is called with null", async () => {
     let hook: ReturnType<typeof useCart> | null = null;
     renderCartContext((h) => {
       hook = h;
     });
+
+    await waitFor(() => expect(hook!.menuItems.length).toBeGreaterThan(0));
 
     act(() => {
       hook!.setTableId("7", "tbl_MYTOKEN9");

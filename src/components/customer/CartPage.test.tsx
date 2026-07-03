@@ -50,18 +50,27 @@ vi.mock("../../lib/supabase", () => {
 
 import { supabase } from "../../lib/supabase";
 
+const WaitForLoad = ({ children }: { children: React.ReactNode }) => {
+  const { menuItems } = useCart();
+  if (menuItems.length === 0) return <div>Loading...</div>;
+  return <>{children}</>;
+};
+
 // Helper to add items to cart and set table context programmatically
 const AddItemAndRender = ({ children }: { children: React.ReactNode }) => {
   const { addToCart, menuItems, setTableId } = useCart();
-  const added = React.useRef(false);
+  const [isReady, setIsReady] = React.useState(false);
+
   React.useEffect(() => {
-    if (!added.current && menuItems.length > 0) {
-      added.current = true;
+    if (menuItems.length > 0 && !isReady) {
       // Set BOTH display number and secure token
       setTableId("3", "tbl_TESTTOKEN");
       addToCart(menuItems[0]);
+      setIsReady(true);
     }
-  }, [addToCart, menuItems, setTableId]);
+  }, [menuItems, isReady, addToCart, setTableId]);
+
+  if (!isReady) return <div>Loading...</div>;
   return <>{children}</>;
 };
 
@@ -72,18 +81,20 @@ describe("CartPage Component & Form Validations", () => {
     vi.clearAllMocks();
   });
 
-  it("displays empty cart message when cart is empty", () => {
+  it("displays empty cart message when cart is empty", async () => {
     render(
       <CartProvider>
-        <MemoryRouter initialEntries={["/cart"]}>
-          <Routes>
-            <Route path="/cart" element={<CartPage />} />
-          </Routes>
-        </MemoryRouter>
+        <WaitForLoad>
+          <MemoryRouter initialEntries={["/cart"]}>
+            <Routes>
+              <Route path="/cart" element={<CartPage />} />
+            </Routes>
+          </MemoryRouter>
+        </WaitForLoad>
       </CartProvider>,
     );
 
-    expect(screen.getByText("Your Cart is Empty")).toBeDefined();
+    expect(await screen.findByText("Your Cart is Empty")).toBeDefined();
     expect(screen.getByText("Browse Menu")).toBeDefined();
   });
 

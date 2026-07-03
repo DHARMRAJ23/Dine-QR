@@ -9,11 +9,9 @@ vi.mock("../../lib/supabase", () => {
   const supabase = {
     rpc: vi.fn(),
     from: vi.fn().mockReturnValue({
-      select: vi
-        .fn()
-        .mockReturnValue({
-          order: vi.fn().mockResolvedValue({ data: [], error: null }),
-        }),
+      select: vi.fn().mockReturnValue({
+        order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      }),
     }),
     channel: vi.fn().mockReturnValue({
       on: vi.fn().mockReturnThis(),
@@ -48,7 +46,7 @@ describe("MainMenu Component — Secure Token Validations", () => {
     vi.clearAllMocks();
   });
 
-  it("shows loading spinner while validating token", () => {
+  it("shows loading spinner while validating token", async () => {
     // Never resolves — stays in loading state
     (supabase.rpc as ReturnType<typeof vi.fn>).mockReturnValue(
       new Promise(() => {}),
@@ -56,6 +54,8 @@ describe("MainMenu Component — Secure Token Validations", () => {
     renderMenu(VALID_TOKEN);
     // The spinner doesn't have explicit text, but we verify the invalid screen is NOT shown yet
     expect(screen.queryByText("Invalid Table QR Code")).toBeNull();
+    // Wait for the async database fetch in CartProvider to resolve to avoid state updates after test exits
+    await waitFor(() => expect(supabase.from).toHaveBeenCalled());
   });
 
   it("renders correctly when token is valid", async () => {
@@ -130,5 +130,7 @@ describe("MainMenu Component — Secure Token Validations", () => {
       (call: unknown[]) => call[0] === "validate_table_token",
     );
     expect(validateCalls.length).toBe(0);
+    // Wait for the async database fetch in CartProvider to resolve to avoid state updates after test exits
+    await waitFor(() => expect(supabase.from).toHaveBeenCalled());
   });
 });

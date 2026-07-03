@@ -20,5 +20,5 @@ const createStorageMock = () => {
   };
 };
 
-global.localStorage = createStorageMock() as Storage;
-global.sessionStorage = createStorageMock() as Storage;
+globalThis.localStorage = createStorageMock() as Storage;
+globalThis.sessionStorage = createStorageMock() as Storage;

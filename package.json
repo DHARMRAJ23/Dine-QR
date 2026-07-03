@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"supabase/**/*.js\"",
     "test": "vitest run",
     "preview": "vite preview"
   },
@@ -27,6 +28,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "jsdom": "^29.1.1",
     "oxlint": "^1.69.0",
+    "prettier": "^3.2.5",
     "tailwindcss": "^4.3.1",
     "typescript": "~6.0.2",
     "vite": "^8.1.0",
