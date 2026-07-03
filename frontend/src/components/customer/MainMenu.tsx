@@ -68,6 +68,8 @@ export const MainMenu: React.FC = () => {
         return;
       }
 
+      const cleanToken = urlTableToken.replace(/\/$/, "");
+
       // If we already have the same token validated in session, skip re-validation
       try {
         const rawToken = sessionStorage.getItem("dine_in_table_token");
@@ -75,7 +77,7 @@ export const MainMenu: React.FC = () => {
         // readStorage JSON-encodes all values, so we parse before comparing
         const storedToken = rawToken ? (JSON.parse(rawToken) as string) : null;
         const storedId = rawId ? (JSON.parse(rawId) as string) : null;
-        if (storedToken === urlTableToken && storedId) {
+        if (storedToken === cleanToken && storedId) {
           if (!cancelled) setTokenStatus("valid");
           return;
         }
@@ -86,7 +88,7 @@ export const MainMenu: React.FC = () => {
       setTokenStatus("validating");
       try {
         const { data, error } = await supabase.rpc("validate_table_token", {
-          p_token: urlTableToken,
+          p_token: cleanToken,
         });
 
         if (cancelled) return;
@@ -97,7 +99,7 @@ export const MainMenu: React.FC = () => {
           setTokenStatus("invalid");
         } else {
           // Store both the friendly display number and the secure token
-          setTableId(data.table_number.toString(), urlTableToken);
+          setTableId(data.table_number.toString(), cleanToken);
           setTokenStatus("valid");
         }
       } catch {
