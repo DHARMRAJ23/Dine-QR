@@ -84,14 +84,14 @@ describe("MainMenu Component — Secure Token Validations", () => {
     );
   });
 
-  it("displays error screen when Supabase returns an error", async () => {
+  it("displays connection error screen when Supabase returns an error", async () => {
     (supabase.rpc as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: null,
       error: { message: "Network error" },
     });
     renderMenu(VALID_TOKEN);
     await waitFor(() =>
-      expect(screen.getByText("Invalid Table QR Code")).toBeDefined(),
+      expect(screen.getByText("Connection Failed")).toBeDefined(),
     );
   });
 

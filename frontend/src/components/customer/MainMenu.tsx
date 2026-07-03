@@ -36,7 +36,7 @@ import { supabase } from "../../lib/supabase";
 import { CATEGORIES } from "../../data/mockData";
 import { ShoppingBag, Sparkles, AlertCircle, Loader2 } from "lucide-react";
 
-type TokenStatus = "validating" | "valid" | "invalid";
+type TokenStatus = "validating" | "valid" | "invalid" | "network-error";
 
 export const MainMenu: React.FC = () => {
   const { tableToken: urlTableToken } = useParams<{ tableToken: string }>();
@@ -55,6 +55,7 @@ export const MainMenu: React.FC = () => {
 
   // Token validation state
   const [tokenStatus, setTokenStatus] = useState<TokenStatus>("validating");
+  const [retryCount, setRetryCount] = useState(0);
 
   // Validate table token against Supabase on mount / when token changes
   useEffect(() => {
@@ -90,7 +91,9 @@ export const MainMenu: React.FC = () => {
 
         if (cancelled) return;
 
-        if (error || !data || !data.valid) {
+        if (error) {
+          setTokenStatus("network-error");
+        } else if (!data || !data.valid) {
           setTokenStatus("invalid");
         } else {
           // Store both the friendly display number and the secure token
@@ -98,7 +101,7 @@ export const MainMenu: React.FC = () => {
           setTokenStatus("valid");
         }
       } catch {
-        if (!cancelled) setTokenStatus("invalid");
+        if (!cancelled) setTokenStatus("network-error");
       }
     };
 
@@ -106,13 +109,37 @@ export const MainMenu: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [urlTableToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [urlTableToken, retryCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Loading spinner while validating
   if (tokenStatus === "validating") {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <Loader2 className="animate-spin text-orange-500" size={32} />
+      </div>
+    );
+  }
+
+  // Error screen for network/server connection failure
+  if (tokenStatus === "network-error") {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center p-6 text-center w-full relative">
+        <div className="w-16 h-16 bg-orange-950/40 border border-orange-900/30 rounded-full flex items-center justify-center text-orange-500 mb-4 shadow-lg animate-pulse">
+          <AlertCircle size={28} />
+        </div>
+        <h2 className="font-display font-bold text-xl text-white">
+          Connection Failed
+        </h2>
+        <p className="text-xs text-slate-400 mt-2 max-w-[260px] leading-relaxed">
+          Could not connect to the menu server. The database may be waking up or
+          your internet connection is unstable.
+        </p>
+        <button
+          onClick={() => setRetryCount((prev) => prev + 1)}
+          className="mt-6 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-orange-600/10 hover:shadow-orange-700/20 active:scale-95 transition-all uppercase tracking-wide cursor-pointer"
+        >
+          Retry Connection
+        </button>
       </div>
     );
   }
