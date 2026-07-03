@@ -56,7 +56,7 @@ export const QRCodeGenerator: React.FC = () => {
   const [error, setError] = useState<string>("");
 
   // ── Fetch existing tables on mount ─────────────────────────────────────────
-  const fetchTables = async () => {
+  const fetchTables = async (isInitial = false) => {
     setIsLoading(true);
     const { data, error: fetchErr } = await supabase
       .from("restaurant_tables")
@@ -67,13 +67,15 @@ export const QRCodeGenerator: React.FC = () => {
       setError("Could not fetch tables: " + fetchErr.message);
     } else if (data) {
       setTables(data as TableRecord[]);
-      if (data.length > 0) setTableCount(data.length);
+      if (isInitial && data.length > 0) {
+        setTableCount(data.length);
+      }
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
-    fetchTables();
+    fetchTables(true);
   }, []);
 
   // ── Rotate table token ─────────────────────────────────────────────────────
@@ -87,7 +89,7 @@ export const QRCodeGenerator: React.FC = () => {
       if (rpcErr) {
         setError("Could not rotate token: " + rpcErr.message);
       } else {
-        await fetchTables();
+        await fetchTables(false);
       }
     } catch (err: any) {
       setError("Could not rotate token: " + err.message);
@@ -116,7 +118,7 @@ export const QRCodeGenerator: React.FC = () => {
       }
 
       // Refresh
-      await fetchTables();
+      await fetchTables(false);
     } finally {
       setIsGenerating(false);
     }
