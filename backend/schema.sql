@@ -44,6 +44,8 @@ END $$;
 -- 2. SCHEMA & COLUMNS ADJUSTMENT
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE restaurant_tables ADD COLUMN IF NOT EXISTS qr_token TEXT UNIQUE;
+ALTER TABLE restaurant_tables DROP CONSTRAINT IF EXISTS unique_restaurant_table;
+ALTER TABLE restaurant_tables ADD CONSTRAINT unique_restaurant_table UNIQUE (restaurant_id, table_number);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pin_code TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pin_attempts INT DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
