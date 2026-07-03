@@ -498,6 +498,9 @@ BEGIN
     RAISE EXCEPTION 'Access Denied: User is not an administrator.';
   END IF;
 
+  -- Delete associated order items first to prevent foreign key constraint violations
+  DELETE FROM order_items WHERE menu_item_id = p_item_id;
+
   DELETE FROM menu_items
   WHERE id = p_item_id;
 END;
