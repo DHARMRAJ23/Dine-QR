@@ -8,7 +8,7 @@
  *      └─ <AuthProvider>     ─ Admin session management
  *         └─ <AppContent>    ─ Router + offline banner + toast
  *            └─ <HashRouter>
- *               ├─ /menu/:tableId  ─ Customer: browse menu (MainMenu)
+ *               ├─ /menu/:tableToken  ─ Customer: browse menu (MainMenu)
  *               ├─ /cart           ─ Customer: review & checkout (CartPage)
  *               ├─ /status/:orderId─ Customer: live order tracker (LiveTracker)
  *               ├─ /admin/login    ─ Admin: authentication (AdminLogin)
@@ -28,19 +28,34 @@
  * - Toast notification overlay (green/red/white slide-up alerts)
  * - Admin route guard (ProtectedRoute checks AuthContext.isAuthenticated)
  */
-import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { CartProvider, useCart } from './context/CartContext';
-import MainMenu from './components/customer/MainMenu';
-import CartPage from './components/customer/CartPage';
-import LiveTracker from './components/customer/LiveTracker';
-import AdminLogin from './components/admin/AdminLogin';
-import OrderBoard from './components/admin/OrderBoard';
-import MenuManager from './components/admin/MenuManager';
-import QRCodeGenerator from './components/admin/QRCodeGenerator';
-import { WifiOff } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import {
+  HashRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { CartProvider, useCart } from "./context/CartContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import { AuthProvider, useAuth } from './context/AuthContext';
+// Lazy loaded components for code splitting
+const MainMenu = React.lazy(() => import("./components/customer/MainMenu"));
+const CartPage = React.lazy(() => import("./components/customer/CartPage"));
+const LiveTracker = React.lazy(
+  () => import("./components/customer/LiveTracker"),
+);
+const AdminLogin = React.lazy(() => import("./components/admin/AdminLogin"));
+const OrderBoard = React.lazy(() => import("./components/admin/OrderBoard"));
+const MenuManager = React.lazy(() => import("./components/admin/MenuManager"));
+const QRCodeGenerator = React.lazy(
+  () => import("./components/admin/QRCodeGenerator"),
+);
+
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="animate-spin h-10 w-10 border-4 border-orange-500 border-t-transparent rounded-full"></div>
+  </div>
+);
 
 /**
  * Route guard that wraps admin-only pages.
@@ -52,8 +67,22 @@ import { AuthProvider, useAuth } from './context/AuthContext';
  *   <ProtectedRoute><OrderBoard /></ProtectedRoute>
  * } />
  */
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
+        <div className="animate-spin h-8 w-8 border-4 border-orange-500 border-t-transparent rounded-full mb-4"></div>
+        <p className="text-slate-400 font-sans text-sm tracking-wide">
+          Loading secure session...
+        </p>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     // Session expired or never created — redirect to login
     return <Navigate to="/admin/login" replace />;
@@ -69,99 +98,98 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 const AppContent: React.FC = () => {
   const { toast } = useCart();
   /** true when the browser reports an active network connection. */
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  /**
-   * Controls the width/layout of the offline banner.
-   * Admin pages use full-width; customer pages use the narrow centred layout.
-   */
-  const [isAdmin, setIsAdmin] = useState(() => window.location.hash.startsWith('#/admin'));
-
+  const [isOnline, setIsOnline] = useState(
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    const handleHashChange = () => setIsAdmin(window.location.hash.startsWith('#/admin'));
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    window.addEventListener('hashchange', handleHashChange);
-
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
   return (
     <Router>
       {!isOnline && (
-        <div className={`sticky top-0 z-50 bg-red-600 text-white text-[11px] text-center p-2.5 flex flex-col items-center justify-center gap-1 shadow-md border-b border-red-700 font-sans ${isAdmin ? 'w-full' : 'max-w-md mx-auto border-x border-red-700'}`}>
+        <div
+          className={`sticky top-0 z-50 bg-red-600 text-white text-[11px] text-center p-2.5 flex flex-col items-center justify-center gap-1 shadow-md border-b border-red-700 font-sans w-full`}
+        >
           <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider">
-            <WifiOff size={13} />
             <span>Connection lost</span>
           </div>
           <p className="text-[9px] text-red-100/90 leading-tight">
-            Orders placed offline will be saved locally on this device only. Do not clear browser history or use private browsing mode, as this will result in order data loss.
+            Orders placed offline will be saved locally on this device only. Do
+            not clear browser history or use private browsing mode, as this will
+            result in order data loss.
           </p>
         </div>
       )}
-      <Routes>
-        {/* Customer Ordering Routes */}
-        <Route path="/menu/:tableId" element={<MainMenu />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/status/:orderId" element={<LiveTracker />} />
+      <div className="flex flex-col min-h-screen">
+        <React.Suspense fallback={<LoadingScreen />}>
+          <Routes>
+            {/* Customer Ordering Routes */}
+            <Route path="/menu/:tableToken" element={<MainMenu />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/status/:orderId" element={<LiveTracker />} />
 
-        {/* Admin Dashboard Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        
-        <Route 
-          path="/admin/dashboard" 
-          element={
-            <ProtectedRoute>
-              <OrderBoard />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/admin/menu" 
-          element={
-            <ProtectedRoute>
-              <MenuManager />
-            </ProtectedRoute>
-          } 
-        />
-        <Route 
-          path="/admin/qr-codes" 
-          element={
-            <ProtectedRoute>
-              <QRCodeGenerator />
-            </ProtectedRoute>
-          } 
-        />
+            {/* Admin Dashboard Routes */}
+            <Route path="/admin/login" element={<AdminLogin />} />
 
-        {/* Fallback Redirections */}
-        <Route path="/" element={<Navigate to="/menu/1" replace />} />
-        <Route path="*" element={<Navigate to="/menu/1" replace />} />
-      </Routes>
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute>
+                  <OrderBoard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/menu"
+              element={
+                <ProtectedRoute>
+                  <MenuManager />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/qr-codes"
+              element={
+                <ProtectedRoute>
+                  <QRCodeGenerator />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback — no default table; prompt customer to scan QR code */}
+            <Route path="/" element={<Navigate to="/menu/invalid" replace />} />
+            <Route path="*" element={<Navigate to="/menu/invalid" replace />} />
+          </Routes>
+        </React.Suspense>
+      </div>
 
       {/* Global Sliding Toast Alert Overlay */}
       {toast && (
-        <div 
+        <div
           className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-50 text-xs font-bold px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2 border animate-slide-up max-w-[90vw] whitespace-nowrap ${
-            toast.type === 'error'
-              ? 'bg-red-950/90 border-red-800 text-red-400'
-              : toast.type === 'success'
-                ? 'bg-green-950/90 border-green-800 text-green-400'
-                : 'bg-slate-900 border-slate-800 text-white'
+            toast.type === "error"
+              ? "bg-red-950/90 border-red-800 text-red-400"
+              : toast.type === "success"
+                ? "bg-green-950/90 border-green-800 text-green-400"
+                : "bg-slate-900 border-slate-800 text-white"
           }`}
         >
-          <span 
+          <span
             className={`w-2 h-2 rounded-full ${
-              toast.type === 'error' 
-                ? 'bg-red-500 animate-ping' 
-                : toast.type === 'success' 
-                  ? 'bg-green-500 animate-ping' 
-                  : 'bg-orange-500 animate-ping'
+              toast.type === "error"
+                ? "bg-red-500 animate-ping"
+                : toast.type === "success"
+                  ? "bg-green-500 animate-ping"
+                  : "bg-orange-500 animate-ping"
             }`}
           ></span>
           <span>{toast.message}</span>

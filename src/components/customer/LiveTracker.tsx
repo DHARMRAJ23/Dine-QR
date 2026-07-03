@@ -34,23 +34,26 @@
  * Displays: table number, guest name, all ordered items with quantities and prices,
  * subtotal, GST, service charge, and grand total.
  */
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useCart } from '../../context/CartContext';
-import { socketBus } from '../../utils/eventBus';
-import { BILLING_CONFIG } from '../../config/billing';
-import { 
-  ClipboardCheck, 
-  ChefHat, 
-  Flame, 
-  Sparkles, 
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+// removed useCart
+import { supabase } from "../../lib/supabase";
+
+import { BILLING_CONFIG } from "../../config/billing";
+import {
+  ClipboardCheck,
+  ChefHat,
+  Flame,
+  Sparkles,
   Home,
   Check,
-  ShoppingBag
-} from 'lucide-react';
+  ShoppingBag,
+  Lock,
+  Loader2,
+} from "lucide-react";
 
 interface TrackingStep {
-  key: 'placed' | 'accepted' | 'preparing' | 'served';
+  key: "placed" | "accepted" | "preparing" | "served";
   title: string;
   description: string;
   icon: React.ComponentType<{ className?: string; size?: number }>;
@@ -59,74 +62,197 @@ interface TrackingStep {
 
 const TRACKING_STEPS: TrackingStep[] = [
   {
-    key: 'placed',
-    title: 'Order Placed',
-    description: 'We have received your order details.',
+    key: "placed",
+    title: "Order Placed",
+    description: "We have received your order details.",
     icon: ClipboardCheck,
-    color: 'border-orange-500 text-orange-500 bg-orange-50',
+    color: "border-orange-500 text-orange-500 bg-orange-50",
   },
   {
-    key: 'accepted',
-    title: 'Accepted by Kitchen',
-    description: 'The kitchen staff has received your order.',
+    key: "accepted",
+    title: "Accepted by Kitchen",
+    description: "The kitchen staff has received your order.",
     icon: ChefHat,
-    color: 'border-blue-500 text-blue-500 bg-blue-50',
+    color: "border-blue-500 text-blue-500 bg-blue-50",
   },
   {
-    key: 'preparing',
-    title: 'Preparing Food',
-    description: 'Our culinary artists are cooking your food.',
+    key: "preparing",
+    title: "Preparing Food",
+    description: "Our culinary artists are cooking your food.",
     icon: Flame,
-    color: 'border-amber-500 text-amber-500 bg-amber-50',
+    color: "border-amber-500 text-amber-500 bg-amber-50",
   },
   {
-    key: 'served',
-    title: 'Served & Completed',
-    description: 'Enjoy your hot meal fresh at your table!',
+    key: "served",
+    title: "Served & Completed",
+    description: "Enjoy your hot meal fresh at your table!",
     icon: Sparkles,
-    color: 'border-green-500 text-green-500 bg-green-50',
+    color: "border-green-500 text-green-500 bg-green-50",
   },
 ];
 
 export const LiveTracker: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { orders } = useCart();
-  
-  const [currentOrder, setCurrentOrder] = useState(() => {
-    return orders.find(o => o.id === orderId) || null;
-  });
 
-  // Keep track of order changes in the context and listen to real-time events
-  useEffect(() => {
-    // 1. Initialize from context
-    const foundOrder = orders.find(o => o.id === orderId);
-    setCurrentOrder(foundOrder ?? null);
+  const [currentOrder, setCurrentOrder] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-    // 2. Listen to real-time socket updates
-    const unsubscribe = socketBus.on('order_status_updated', ({ orderId: updatedId, status }) => {
-      if (updatedId === orderId) {
-        setCurrentOrder(prev => prev ? { ...prev, status } : null);
+  // PIN State
+  const [pin, setPin] = useState(
+    sessionStorage.getItem(`order_pin_${orderId}`) || "",
+  );
+  const [isPinValid, setIsPinValid] = useState(false);
+  const [pinError, setPinError] = useState("");
+
+  // Fetch table token from sessionStorage to navigate back to menu safely
+  const getMenuPath = () => {
+    try {
+      const storedToken = sessionStorage.getItem("dine_in_table_token");
+      if (storedToken) {
+        return JSON.parse(storedToken);
       }
-    });
+    } catch (e) {
+      console.error("Error reading table token:", e);
+    }
+    return "invalid";
+  };
+
+  // Fetch Order Securely via RPC
+  const fetchOrder = async (pinToUse: string) => {
+    if (!orderId) return;
+    setIsLoading(true);
+    setPinError("");
+
+    try {
+      const { data, error } = await supabase.rpc("get_order_by_pin", {
+        p_order_id: orderId,
+        p_pin_code: pinToUse,
+      });
+
+      if (error) throw error;
+      if (!data || !data.success) {
+        setPinError(data?.error || "Invalid PIN Code");
+        setIsPinValid(false);
+        setCurrentOrder(null);
+      } else {
+        setIsPinValid(true);
+        setCurrentOrder(data.order);
+        sessionStorage.setItem(`order_pin_${orderId}`, pinToUse);
+      }
+    } catch (err) {
+      console.error(err);
+      setPinError("Failed to verify PIN. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (pin) {
+      fetchOrder(pin);
+    } else {
+      setIsLoading(false);
+    }
+  }, [orderId]);
+
+  // Handle Realtime updates securely
+  useEffect(() => {
+    if (!isPinValid || !orderId) return;
+
+    // Subscribe to UPDATE events. Even if RLS blocks the payload, we get the notification
+    // and can securely refetch the updated data using our RPC function.
+    const channel = supabase
+      .channel(`order_${orderId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${orderId}`,
+        },
+        () => {
+          fetchOrder(pin);
+        },
+      )
+      .subscribe();
 
     return () => {
-      unsubscribe();
+      supabase.removeChannel(channel);
     };
-  }, [orderId, orders]);
+  }, [isPinValid, orderId, pin]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="animate-spin text-orange-500" size={32} />
+      </div>
+    );
+  }
+
+  // If PIN is missing or invalid, show the PIN entry screen
+  if (!isPinValid) {
+    return (
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-6 flex flex-col items-center justify-center text-center w-full">
+        <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center text-orange-500 mb-6 shadow-sm border border-orange-200">
+          <Lock size={28} />
+        </div>
+        <h2 className="font-display font-bold text-2xl text-slate-800 mb-2">
+          Order Protected
+        </h2>
+        <p className="text-sm text-slate-500 max-w-xs mb-8">
+          To protect guest privacy, please enter the 6-digit PIN associated with
+          this order.
+        </p>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchOrder(pin);
+          }}
+          className="w-full max-w-xs space-y-4"
+        >
+          <div>
+            <input
+              type="text"
+              maxLength={6}
+              placeholder="Enter 6-Digit PIN"
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              className="w-full text-center text-2xl tracking-widest font-mono p-4 rounded-2xl border-2 border-slate-200 focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all outline-none bg-white shadow-sm"
+              required
+            />
+            {pinError && (
+              <p className="text-red-500 text-xs font-semibold mt-2">
+                {pinError}
+              </p>
+            )}
+          </div>
+          <button
+            type="submit"
+            className="w-full py-4 bg-orange-600 text-white font-bold text-sm rounded-xl hover:bg-orange-700 active:scale-95 transition-all uppercase tracking-wider shadow-md shadow-orange-600/20"
+          >
+            View Order
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (!currentOrder) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-6 flex flex-col items-center justify-center text-center max-w-md mx-auto border-x border-slate-100 shadow-2xl">
+      <div className="min-h-screen bg-slate-50 text-slate-900 font-sans p-6 flex flex-col items-center justify-center text-center w-full">
         <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-4 border border-red-100/50">
           <ShoppingBag size={28} />
         </div>
         <h3 className="font-bold text-slate-800 text-lg">Order Not Found</h3>
         <p className="text-xs text-slate-400 mt-1 max-w-[240px]">
-          We couldn't locate details for this order. It might be archived or deleted.
+          We couldn't locate details for this order. It might be archived or
+          deleted.
         </p>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="mt-6 px-6 py-2 bg-orange-600 text-white font-semibold text-xs rounded-xl hover:bg-orange-700 active:scale-95 transition-all uppercase tracking-wider"
         >
           Go Back Home
@@ -143,25 +269,28 @@ export const LiveTracker: React.FC = () => {
       preparing: 2,
       served: 3,
     };
-    return statusMap[currentOrder.status] ?? 0;
+    return statusMap[currentOrder.status as keyof typeof statusMap] ?? 0;
   };
 
   const activeIndex = getActiveStepIndex();
 
   // Legacy order calculations fallbacks
-  const subtotal = currentOrder.subtotal ?? (currentOrder as any).totalAmount ?? 0;
+  const subtotal =
+    currentOrder.subtotal ?? (currentOrder as any).totalAmount ?? 0;
   const tax = currentOrder.tax ?? Math.round(subtotal * BILLING_CONFIG.taxRate);
-  const serviceCharge = currentOrder.serviceCharge ?? BILLING_CONFIG.serviceCharge;
-  const grandTotal = currentOrder.grandTotal ?? (subtotal + tax + serviceCharge);
+  const serviceCharge =
+    currentOrder.serviceCharge ?? BILLING_CONFIG.serviceCharge;
+  const grandTotal = currentOrder.grandTotal ?? subtotal + tax + serviceCharge;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24 shadow-2xl relative max-w-md mx-auto border-x border-slate-100 flex flex-col">
-      
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans pb-24 relative w-full flex flex-col">
       {/* Top Header */}
       <header className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shadow-sm">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Live Tracker</span>
-        <button 
-          onClick={() => navigate(`/menu/${currentOrder.tableId}`)}
+        <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+          Live Tracker
+        </span>
+        <button
+          onClick={() => navigate(`/menu/${getMenuPath()}`)}
           className="p-1.5 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-1 text-xs font-semibold"
         >
           <Home size={14} />
@@ -172,15 +301,14 @@ export const LiveTracker: React.FC = () => {
       <div className="flex-1 p-5 space-y-6 overflow-y-auto">
         {/* Animated Green Checkmark and Header */}
         <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-          
           {/* Animated SVG Checkmark */}
           <div className="w-16 h-16 bg-green-50 border border-green-200 rounded-full flex items-center justify-center text-green-600 shadow-inner mb-4">
-            <svg 
-              className="w-8 h-8 stroke-current" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              strokeWidth="3" 
-              strokeLinecap="round" 
+            <svg
+              className="w-8 h-8 stroke-current"
+              viewBox="0 0 24 24"
+              fill="none"
+              strokeWidth="3"
+              strokeLinecap="round"
               strokeLinejoin="round"
             >
               <polyline className="animate-draw" points="20 6 9 17 4 12" />
@@ -188,35 +316,54 @@ export const LiveTracker: React.FC = () => {
           </div>
 
           <h2 className="font-display font-bold text-xl text-slate-900 leading-tight">
-            {currentOrder.status === 'placed' && "Order Placed Successfully!"}
-            {currentOrder.status === 'accepted' && "Order Accepted!"}
-            {currentOrder.status === 'preparing' && "Cooking Your Meal!"}
-            {currentOrder.status === 'served' && "Order Served!"}
+            {currentOrder.status === "placed" && "Order Placed Successfully!"}
+            {currentOrder.status === "accepted" && "Order Accepted!"}
+            {currentOrder.status === "preparing" && "Cooking Your Meal!"}
+            {currentOrder.status === "served" && "Order Served!"}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            {currentOrder.status === 'placed' && `Thank you, ${currentOrder.guestName}. We've sent your order to the kitchen.`}
-            {currentOrder.status === 'accepted' && `The kitchen staff has approved your order, ${currentOrder.guestName}.`}
-            {currentOrder.status === 'preparing' && `Chef is preparing your fresh meal now!`}
-            {currentOrder.status === 'served' && `Enjoy your hot meal at Table ${currentOrder.tableId}!`}
+            {currentOrder.status === "placed" &&
+              `Thank you, ${currentOrder.guestName}. We've sent your order to the kitchen.`}
+            {currentOrder.status === "accepted" &&
+              `The kitchen staff has approved your order, ${currentOrder.guestName}.`}
+            {currentOrder.status === "preparing" &&
+              `Chef is preparing your fresh meal now!`}
+            {currentOrder.status === "served" &&
+              `Enjoy your hot meal at Table ${currentOrder.tableNumber ?? currentOrder.tableId}!`}
           </p>
 
           {/* Quick Summary Badges */}
           <div className="grid grid-cols-2 gap-3 w-full mt-5 pt-4 border-t border-slate-100">
             <div className="bg-slate-50 rounded-xl p-2.5 text-center">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Order ID</span>
-              <span className="text-sm font-bold text-slate-800 tabular-nums">{currentOrder.id}</span>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                Order ID
+              </span>
+              <span
+                className="text-sm font-bold text-slate-800 tabular-nums"
+                title={`Full Order ID: ${currentOrder.id}`}
+              >
+                #
+                {currentOrder.orderNumber ||
+                  currentOrder.id.slice(-4).toUpperCase()}
+              </span>
             </div>
             <div className="bg-slate-50 rounded-xl p-2.5 text-center">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Table No.</span>
-              <span className="text-sm font-bold text-orange-600">Table {currentOrder.tableId}</span>
+              <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                Table No.
+              </span>
+              <span className="text-sm font-bold text-orange-600">
+                Table {currentOrder.tableNumber ?? currentOrder.tableId}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Visual Progress Timeline */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-1">
-          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-6">Kitchen Progress</h3>
-          
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-6">
+            Kitchen Progress
+          </h3>
+
           <div className="relative">
             {TRACKING_STEPS.map((step, idx) => {
               const StepIcon = step.icon;
@@ -225,25 +372,27 @@ export const LiveTracker: React.FC = () => {
               const isUpcoming = idx > activeIndex;
 
               return (
-                <div key={step.key} className="flex gap-4 relative pb-8 last:pb-2">
-                  
+                <div
+                  key={step.key}
+                  className="flex gap-4 relative pb-8 last:pb-2"
+                >
                   {/* Step Connector Line */}
                   {idx < TRACKING_STEPS.length - 1 && (
-                    <div 
+                    <div
                       className={`absolute left-5 top-10 bottom-0 w-0.5 -translate-x-1/2 transition-colors duration-500 ${
-                        isCompleted ? 'bg-orange-500' : 'bg-slate-200'
+                        isCompleted ? "bg-orange-500" : "bg-slate-200"
                       }`}
                     ></div>
                   )}
 
                   {/* Step Node Icon container */}
-                  <div 
+                  <div
                     className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                      isCompleted 
-                        ? 'bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-600/10'
+                      isCompleted
+                        ? "bg-orange-500 border-orange-500 text-white shadow-md shadow-orange-600/10"
                         : isActive
                           ? `${step.color} scale-110 shadow-lg border-current ring-4 ring-orange-100`
-                          : 'bg-white border-slate-200 text-slate-300'
+                          : "bg-white border-slate-200 text-slate-300"
                     }`}
                   >
                     {isCompleted ? (
@@ -255,22 +404,20 @@ export const LiveTracker: React.FC = () => {
 
                   {/* Step Info Text */}
                   <div className="flex-1 pt-1.5">
-                    <h4 
+                    <h4
                       className={`text-xs font-bold transition-colors duration-500 ${
-                        isActive 
-                          ? 'text-orange-600 text-[13px]'
-                          : isUpcoming 
-                            ? 'text-slate-400' 
-                            : 'text-slate-900'
+                        isActive
+                          ? "text-orange-600 text-[13px]"
+                          : isUpcoming
+                            ? "text-slate-400"
+                            : "text-slate-900"
                       }`}
                     >
                       {step.title}
                     </h4>
-                    <p 
+                    <p
                       className={`text-[10px] mt-0.5 transition-colors duration-500 ${
-                        isActive 
-                          ? 'text-slate-600' 
-                          : 'text-slate-400'
+                        isActive ? "text-slate-600" : "text-slate-400"
                       }`}
                     >
                       {step.description}
@@ -284,34 +431,49 @@ export const LiveTracker: React.FC = () => {
 
         {/* Order Items Breakdown */}
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
-          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400">Items Ordered</h3>
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400">
+            Items Ordered
+          </h3>
           <div className="divide-y divide-slate-100">
-            {currentOrder.items.map((item) => (
-              <div key={item.itemId} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0 text-xs">
+            {currentOrder.items?.map((item: any) => (
+              <div
+                key={item.itemId}
+                className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0 text-xs"
+              >
                 <div className="flex items-center gap-1.5">
-                  <span 
+                  <span
                     className={`w-2.5 h-2.5 border flex items-center justify-center rounded-sm ${
-                      item.isVeg ? 'border-green-600' : 'border-red-600'
+                      item.isVeg ? "border-green-600" : "border-red-600"
                     }`}
                   >
-                    <span 
+                    <span
                       className={`w-1 h-1 rounded-full ${
-                        item.isVeg ? 'bg-green-600' : 'bg-red-600'
+                        item.isVeg ? "bg-green-600" : "bg-red-600"
                       }`}
                     ></span>
                   </span>
-                  <span className="font-medium text-slate-800">{item.name}</span>
-                  <span className="text-slate-400 font-bold ml-1">x{item.quantity}</span>
+                  <span className="font-medium text-slate-800">
+                    {item.name}
+                  </span>
+                  <span className="text-slate-400 font-bold ml-1">
+                    x{item.quantity}
+                  </span>
                 </div>
-                <span className="font-bold text-slate-900 tabular-nums">₹{item.price * item.quantity}</span>
+                <span className="font-bold text-slate-900 tabular-nums">
+                  ₹{item.price * item.quantity}
+                </span>
               </div>
             ))}
           </div>
 
           {currentOrder.specialInstructions && (
             <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[11px] mt-3">
-              <span className="font-bold text-slate-500 block mb-0.5">Special Instructions:</span>
-              <p className="text-slate-600 italic">"{currentOrder.specialInstructions}"</p>
+              <span className="font-bold text-slate-500 block mb-0.5">
+                Special Instructions:
+              </span>
+              <p className="text-slate-600 italic">
+                "{currentOrder.specialInstructions}"
+              </p>
             </div>
           )}
           <div className="border-t border-slate-100 pt-3 space-y-1.5 text-[11px] text-slate-500 mt-2">
@@ -334,11 +496,11 @@ export const LiveTracker: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Return to Menu Footer */}
-      <div className="fixed bottom-0 left-4 right-4 max-w-md mx-auto p-4 z-40 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
+      <div className="fixed bottom-0 left-0 right-0 max-w-3xl mx-auto p-4 z-40 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent">
         <button
-          onClick={() => navigate(`/menu/${currentOrder.tableId}`)}
+          onClick={() => navigate(`/menu/${getMenuPath()}`)}
           className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-xl font-bold text-xs shadow-md hover:bg-slate-50 active:scale-95 transition-all flex items-center justify-center gap-1.5 uppercase tracking-wider"
         >
           <span>Order More Food</span>

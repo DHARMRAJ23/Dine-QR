@@ -91,6 +91,7 @@ export interface OrderItem {
  */
 export interface Order {
   id: string;
+  orderNumber?: number;
   tableId: string;
   guestName: string;
   items: OrderItem[];
@@ -99,6 +100,6 @@ export interface Order {
   tax: number;
   serviceCharge: number;
   grandTotal: number;
-  status: 'placed' | 'accepted' | 'preparing' | 'served';
+  status: "placed" | "accepted" | "preparing" | "served";
   placedAt: string; // ISO 8601 string
 }

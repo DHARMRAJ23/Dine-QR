@@ -21,8 +21,8 @@
  * const ok   = writeStorage(localStorage, 'dine_in_menu', updatedMenu);
  */
 
-import type { FoodItem, Order, OrderItem } from '../types';
-import type { CartItem } from '../context/CartContext';
+import type { FoodItem, Order, OrderItem } from "../types";
+import type { CartItem } from "../context/CartContext";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Type Guards — one per domain object
@@ -36,17 +36,19 @@ import type { CartItem } from '../context/CartContext';
  * can be a long base64 data URL (validated at upload time, not on read).
  */
 export function isFoodItem(value: unknown): value is FoodItem {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
   return (
-    typeof o.id === 'string' &&
-    typeof o.name === 'string' &&
-    typeof o.price === 'number' &&
-    typeof o.description === 'string' &&
-    typeof o.category === 'string' &&
-    typeof o.image === 'string' &&
-    typeof o.isVeg === 'boolean' &&
-    typeof o.isAvailable === 'boolean'
+    typeof o.id === "string" &&
+    typeof o.name === "string" &&
+    typeof o.price === "number" &&
+    Number.isFinite(o.price) &&
+    o.price >= 0 &&
+    typeof o.description === "string" &&
+    typeof o.category === "string" &&
+    typeof o.image === "string" &&
+    typeof o.isVeg === "boolean" &&
+    typeof o.isAvailable === "boolean"
   );
 }
 
@@ -63,14 +65,14 @@ export function isFoodItemArray(value: unknown): value is FoodItem[] {
  * This is used inside `isOrder` — not exported for direct external use.
  */
 export function isOrderItem(value: unknown): value is OrderItem {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
   return (
-    typeof o.itemId === 'string' &&
-    typeof o.name === 'string' &&
-    typeof o.price === 'number' &&
-    typeof o.quantity === 'number' &&
-    typeof o.isVeg === 'boolean'
+    typeof o.itemId === "string" &&
+    typeof o.name === "string" &&
+    typeof o.price === "number" &&
+    typeof o.quantity === "number" &&
+    typeof o.isVeg === "boolean"
   );
 }
 
@@ -79,10 +81,10 @@ export function isOrderItem(value: unknown): value is OrderItem {
  * Used to prevent invalid status values being loaded from storage or emitted
  * across tabs via the event bus.
  */
-export function isOrderStatus(value: unknown): value is Order['status'] {
+export function isOrderStatus(value: unknown): value is Order["status"] {
   return (
-    typeof value === 'string' &&
-    ['placed', 'accepted', 'preparing', 'served'].includes(value)
+    typeof value === "string" &&
+    ["placed", "accepted", "preparing", "served"].includes(value)
   );
 }
 
@@ -91,20 +93,25 @@ export function isOrderStatus(value: unknown): value is Order['status'] {
  * Runs `isOrderItem` on every item in the `items` array.
  */
 export function isOrder(value: unknown): value is Order {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
+  // Validate placedAt is a valid ISO 8601 date string
+  const isValidDate =
+    typeof o.placedAt === "string" &&
+    !isNaN(Date.parse(o.placedAt)) &&
+    /^\d{4}-\d{2}-\d{2}/.test(o.placedAt);
   return (
-    typeof o.id === 'string' &&
-    typeof o.tableId === 'string' &&
-    typeof o.guestName === 'string' &&
+    typeof o.id === "string" &&
+    typeof o.tableId === "string" &&
+    typeof o.guestName === "string" &&
     Array.isArray(o.items) &&
     o.items.every(isOrderItem) &&
-    typeof o.subtotal === 'number' &&
-    typeof o.tax === 'number' &&
-    typeof o.serviceCharge === 'number' &&
-    typeof o.grandTotal === 'number' &&
+    typeof o.subtotal === "number" &&
+    typeof o.tax === "number" &&
+    typeof o.serviceCharge === "number" &&
+    typeof o.grandTotal === "number" &&
     isOrderStatus(o.status) &&
-    typeof o.placedAt === 'string'
+    isValidDate
   );
 }
 
@@ -121,12 +128,14 @@ export function isOrderArray(value: unknown): value is Order[] {
  * Runs `isFoodItem` on the nested `item` property.
  */
 export function isCartItem(value: unknown): value is CartItem {
-  if (typeof value !== 'object' || value === null) return false;
+  if (typeof value !== "object" || value === null) return false;
   const o = value as Record<string, unknown>;
   return (
     isFoodItem(o.item) &&
-    typeof o.quantity === 'number' &&
-    Number.isSafeInteger(o.quantity)
+    typeof o.quantity === "number" &&
+    Number.isInteger(o.quantity) &&
+    o.quantity >= 1 &&
+    o.quantity <= 20
   );
 }
 
@@ -166,7 +175,7 @@ export function readStorage<T>(
   storage: Storage | undefined | null,
   key: string,
   fallback: T,
-  validator?: (value: unknown) => value is T
+  validator?: (value: unknown) => value is T,
 ): T {
   if (!storage) return fallback;
 
@@ -183,9 +192,13 @@ export function readStorage<T>(
       } else {
         console.warn(
           `[storage] Validation failed for key "${key}". ` +
-          `Removing corrupted value and returning fallback.`
+            `Removing corrupted value and returning fallback.`,
         );
-        try { storage.removeItem(key); } catch { /* ignore */ }
+        try {
+          storage.removeItem(key);
+        } catch {
+          /* ignore */
+        }
         return fallback;
       }
     }
@@ -193,9 +206,14 @@ export function readStorage<T>(
     return parsed as T;
   } catch (err) {
     console.error(
-      `[storage] Error reading key "${key}". Removing and returning fallback.`, err
+      `[storage] Error reading key "${key}". Removing and returning fallback.`,
+      err,
     );
-    try { storage.removeItem(key); } catch { /* ignore */ }
+    try {
+      storage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
     return fallback;
   }
 }
@@ -219,7 +237,7 @@ export function readStorage<T>(
 export function writeStorage(
   storage: Storage | undefined | null,
   key: string,
-  value: unknown
+  value: unknown,
 ): boolean {
   if (!storage) return false;
 
@@ -228,7 +246,8 @@ export function writeStorage(
     return true;
   } catch (err) {
     console.error(
-      `[storage] Quota or write error for key "${key}". Data NOT saved.`, err
+      `[storage] Quota or write error for key "${key}". Data NOT saved.`,
+      err,
     );
     return false;
   }

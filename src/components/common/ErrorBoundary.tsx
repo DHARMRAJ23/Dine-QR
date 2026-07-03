@@ -31,9 +31,9 @@
  * In main.tsx the boundary wraps the entire <App />, so ANY uncaught
  * render error in the application is safely caught here.
  */
-import { Component } from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
+import { Component } from "react";
+import type { ErrorInfo, ReactNode } from "react";
+import { AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -55,7 +55,11 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error in application render tree:', error, errorInfo);
+    console.error(
+      "Uncaught error in application render tree:",
+      error,
+      errorInfo,
+    );
   }
 
   private handleReload = () => {
@@ -65,12 +69,12 @@ export class ErrorBoundary extends Component<Props, State> {
   private handleResetData = () => {
     if (
       window.confirm(
-        'This will clear all browser storage (orders, menu, cart) to resolve potential data corruption. Do you want to continue?'
+        "This will clear all browser storage (orders, menu, cart) to resolve potential data corruption. Do you want to continue?",
       )
     ) {
       localStorage.clear();
       sessionStorage.clear();
-      window.location.href = '/';
+      window.location.href = "/";
     }
   };
 
@@ -78,11 +82,10 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-100 font-sans">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden text-center space-y-6">
-            
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden text-center space-y-6">
             {/* Decorative glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
-            
+
             <div className="w-16 h-16 bg-red-950/40 border border-red-900/30 rounded-2xl flex items-center justify-center mx-auto text-red-500 shadow-lg">
               <AlertTriangle size={32} />
             </div>
@@ -91,8 +94,9 @@ export class ErrorBoundary extends Component<Props, State> {
               <h1 className="font-display font-bold text-2xl text-white tracking-wide">
                 Something went wrong
               </h1>
-              <p className="text-xs text-slate-400 max-w-[280px] mx-auto leading-relaxed">
-                The application encountered an unexpected rendering error. This could be due to invalid or corrupted storage records.
+              <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                The application encountered an unexpected rendering error. This
+                could be due to invalid or corrupted storage records.
               </p>
             </div>
 
@@ -121,7 +125,6 @@ export class ErrorBoundary extends Component<Props, State> {
                 <span>Reset Application</span>
               </button>
             </div>
-
           </div>
         </div>
       );
